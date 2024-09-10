@@ -30,6 +30,7 @@ end
 
 
 function RTA(dρ,ρ,p,t)
+
     N   = p[1]
     L   = p[2]
     η₀   = p[3]
@@ -96,14 +97,23 @@ for (n,nv) in enumerate(nₐᵣ)
 end
 
 
+ϵᵈ₀ = ρ₀[nₑ,1]
+nᵈ₀ = ρ₀[nₙ,1]
 
-p = [N,L,η₀,nₐᵣ,nₙ,nₑ]
+println("m  : ", m)
+println("T₀ : ",(1/3)*(ϵᵈ₀/nᵈ₀))
+println("t₀ : ",ti)
 
+p = (N,L,η₀,nₐᵣ,nₙ,nₑ)
+
+println("Solving Basic RTA.")
 prob = ODEProblem(RTA,ρ₀,tspan,p)
 sol = solve(prob)
 
 T = (1/3)*(sol[nₑ,1,:]./sol[nₙ,1,:])
-τ = (T.*(sol.t)./η)
+τ = (T.*(sol.t)./η₀)
 
+
+println("Plotting Temperature proper time graph.")
 plot(τ,T, xaxis=:log)
 #plot(sol.t,sol[nₙ,1,:], xaxis=:log)
