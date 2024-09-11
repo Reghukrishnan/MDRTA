@@ -1,6 +1,7 @@
 using LinearAlgebra
 using SpecialFunctions
 using Plots
+using JLD
 
 
 function trange(tspan,N,interpolation)
@@ -95,10 +96,6 @@ function ρeq(T,μ,n,l)
 end
 
 
-
-
-
-
 function RTA(dρ::Matrix,ρ,t::Float64,p)
     N   = p[1]
     L   = p[2]
@@ -134,130 +131,27 @@ end
 #---------------------------------------------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------------------------------
 
-function MDRTA_S(dρ::Matrix,ρ,t::Float64,p)
-    N   = 3
-    L   = p[2]
-    η₀   = p[3]
-    nₐᵣ = p[4]
-    nₙ  = p[5]
-    nₑ  = p[6]
-
-    nᵈ = ρ[2,1]
-    ϵᵈ = ρ[3,1]
-
-    # Computing Temperature and Chemical potential
-    T = (1/3)*(ϵᵈ/nᵈ)    
-    μ = T*log( 27*(π^2)*nᵈ*((nᵈ/ϵᵈ)^3))
-
-    # The reciprocal of relaxation time
-    ωᵣ = (T^2)/η₀
-
-    #Free Streaming of n = 0.
-    # n = 0, l = 0
-    dρ[1,1]     = -(1/t)*(                      Q(0,0)*ρ[1,1]   + R(0,0)*ρ[1,1+1]   ) 
-    for j in 2:L-1
-        # n = 0, l = j -1
-        dρ[1,j] = -(1/t)*(  P(0,j-1)*ρ[1,j-1] + Q(0,j-1)*ρ[1,j] + R(0,j-1)*ρ[1,j+1]   )
-    end
-    # n = 0, l = L -1
-    dρ[1,L]     = -(1/t)*(  P(0,L-1)*ρ[1,L-1] +  Q(0,L-1)*ρ[1,L]                    )
-
-    for i in 2:3
-            # Collision kernal zero for number and energy desnity, n = 1,2 (Array index 2,3) and l = 0 (Array index 1).
-            # n = 1,2, l = 0
-            dρ[i,1] = -(1/t)*(                      Q(i-1,0)*ρ[i,1] + R(i-1,0)*ρ[i,2]    )
-        # Running through all l > 0 moments.
-        for j in 2:L-1 
-            # n = i-1, l = j-1                                                                     # Collision dependance.
-            dρ[i,j] = -(1/t)*( P(i-1,j-1)*ρ[i,j-1] +  Q(i-1,j-1)*ρ[i,j] + R(i-1,j-1)*ρ[i,j+1]    )  - ωᵣ*ρ[i-1,j] 
-        end
-        # Truncation for l = L moment.
-        # n = i-1, l = L-1
-        dρ[i,L]     = -(1/t)*( P(i-1,L-1)*ρ[i,L-1] +  Q(i-1,L-1)*ρ[i,L]                      )  - ωᵣ*ρ[i-1,L]
-    end
-
-    return dρ
-end
-
-#---------------------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------------------
 
 
-
-function MDRTA_ST(dρ::Matrix,ρ,t::Float64,p)
-    N   = 3
-    L   = p[2]
-    η₀   = p[3]
-    nₐᵣ = p[4]
-    nₙ  = p[5]
-    nₑ  = p[6]
-
-    nᵈ = ρ[2,1]
-    ϵᵈ = ρ[3,1]
-
-    # Computing Temperature and Chemical potential
-    T = (1/3)*(ϵᵈ/nᵈ)    
-    μ = T*log( 27*(π^2)*nᵈ*((nᵈ/ϵᵈ)^3))
-
-    # The reciprocal of relaxation time
-    ωᵣ = (T^(1+1))/η₀
-
-    #Free Streaming of n = 0.
-    # n = 0, l = 0
-    dρ[1,1]     = -(1/t)*(                      Q(0,0)*ρ[1,1]   + R(0,0)*ρ[1,1+1]   ) 
-    for j in 2:L-1
-        # n = 0, l = j -1
-        dρ[1,j] = -(1/t)*(  P(0,j-1)*ρ[1,j-1] + Q(0,j-1)*ρ[1,j] + R(0,j-1)*ρ[1,j+1]   )
-    end
-    # n = 0, l = L -1
-    dρ[1,L]     = -(1/t)*(  P(0,L-1)*ρ[1,L-1] +  Q(0,L-1)*ρ[1,L]                    )
-
-    for i in 2:3
-            # Collision kernal zero for number and energy desnity, n = 1,2 (Array index 2,3) and l = 0 (Array index 1).
-            # n = 1,2, l = 0
-            dρ[i,1] = -(1/t)*(                      Q(i-1,0)*ρ[i,1] + R(i-1,0)*ρ[i,2]    )
-        # Running through all l > 0 moments.
-        for j in 2:L-1 
-            # n = i-1, l = j-1                                                                     # Collision dependance.
-            dρ[i,j] = -(1/t)*( P(i-1,j-1)*ρ[i,j-1] +  Q(i-1,j-1)*ρ[i,j] + R(i-1,j-1)*ρ[i,j+1]    )  - ωᵣ*ρ[i,j] 
-        end
-        # Truncation for l = L moment.
-        # n = i-1, l = L-1
-        dρ[i,L]     = -(1/t)*( P(i-1,L-1)*ρ[i,L-1] +  Q(i-1,L-1)*ρ[i,L]                      )  - ωᵣ*ρ[i,L]
-    end
-
-    return dρ
-end
+nₐᵣ = [1,2,3]
 
 
-
-#---------------------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------------------
-
-
-nₐᵣ = [0,1,2]
-
-
-nₙ  = 2
-nₑ  = 3
+nₙ  = 1
+nₑ  = 2
 
 T₀  = 1
-Λ   = 1
 m   = 0
 μ₀  = 0
-
 
 N = size(nₐᵣ)[1]
 L = 10
 
 
 tₛ = 0.1
-tₑ = 50
+tₑ = 200
 ξ  = 0.01
 
-#--------------------------------
-η₀ = (tₛ/ξ)*((T₀)^(1+1))
-#--------------------------------
+η₀ = (tₛ*T₀)/ξ
 
 tspan = (tₛ,tₑ)
 
@@ -269,9 +163,6 @@ for (n,nv) in enumerate(nₐᵣ)
     end
 end
 
-ϵᵈ₀ = ρ₀[nₑ,1]
-nᵈ₀ = ρ₀[nₙ,1]
-
 println("m     : ", m)
 println("T₀    : ",(1/3)*(ϵᵈ₀/nᵈ₀))
 println("t₀    : ",tₛ)
@@ -281,20 +172,17 @@ println("η₀/s₀ : ",η₀)
 p = (N,L,η₀,nₐᵣ,nₙ,nₑ)
 
 tspan = trange((tₛ,tₑ),100,"log")
+ρₜ = RK4(ρ₀,tspan,RTA,p)
 
+E = ρₜ[:,nₑ,1]
+N = ρₜ[:,nₙ,1]
 
-#------------------------------------------------
+T = (1/3)*(E./N)
+τ = (T.*(tspan)./η₀)
 
-ρₜ = RK4(ρ₀,tspan,MDRTA_S,p)
+y = (tspan,ρₜ)
+println("Saving data.")
+save("Data/RTA_T_1.jld","y",y)
 
-#------------------------------------------------
-
-ϵᵈ = ρₜ[:,nₑ,1]
-nᵈ = ρₜ[:,nₙ,1]
-
-T = (1/3)*(ϵᵈ./nᵈ)
-τ = ((T.^(1+1)).*(tspan)./η₀)
 
 plot(τ,T, xaxis=:log)
-#plot(tspan,log.(nᵈ), xaxis=:log)
-#plot(tspan,T, xaxis=:log)

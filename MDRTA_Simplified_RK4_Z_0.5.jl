@@ -1,6 +1,7 @@
 using LinearAlgebra
 using SpecialFunctions
 using Plots
+using JLD
 
 
 function trange(tspan,N,interpolation)
@@ -95,62 +96,101 @@ function ρeq(T,μ,n,l)
 end
 
 
-function RTA(dρ::Matrix,ρ,t::Float64,p)
-    N   = p[1]
+#---------------------------------------------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------------------------------
+
+function MDRTA_S(dρ::Matrix,ρ,t::Float64,p)
+    N   = 3
     L   = p[2]
     η₀   = p[3]
     nₐᵣ = p[4]
     nₙ  = p[5]
     nₑ  = p[6]
 
-    Nd = ρ[nₙ,1]
-    Ed = ρ[nₑ,1]
-    T = (1/3)*(Ed/Nd)
-    #print(T)
-    μ = T*log( 27*(π^2)*Nd*((Nd/Ed)^3))
+    nᵈ = ρ[nₙ,1]
+    ϵᵈ = ρ[nₑ,1]
+
+    # Computing Temperature and Chemical potential
+    T = (1/3)*(ϵᵈ/nᵈ)    
+    μ = T*log( 27*(π^2)*nᵈ*((nᵈ/ϵᵈ)^3))
+
+    # The reciprocal of relaxation time
+    Λ = 0.5
+    ωᵣ = (T^(1+0.5))/η₀
+
+
     
 
-    for (n,nv) in enumerate(nₐᵣ)
-        for l =0:L-1
-            if l == 0
-                dρ[n,l+1] = - (0  + Q(nv,l)*ρ[n,l+1] + R(nv,l)*ρ[n,l+2] + (T/η₀)*t*(ρ[n,l+1] - ρeq(T,μ,nv,l) ) )/t
-                #if nv ==1 || nv == 2
-                #    print((ρ[n,l+1] - ρeq(T,μ,nv,l) ),"\n")
-                #end
-            elseif l == L-1
-                dρ[n,l+1] = - (P(nv,l)*ρ[n,l]  + Q(nv,l)*ρ[n,l+1] + 0 + (T/η₀)*t*(ρ[n,l+1] - ρeq(T,μ,nv,l)  ) )/t
-            else
-                dρ[n,l+1] = - (P(nv,l)*ρ[n,l]  + Q(nv,l)*ρ[n,l+1] + R(nv,l)*ρ[n,l+2] + (T/η₀)*t*(ρ[n,l+1] - ρeq(T,μ,nv,l)  ) )/t
-                
-            end
-        end
+    #Free Streaming of n = 0.
+    # n = 0, l = 0
+    dρ[1,1]     = -(1/t)*(                      Q(0.5,0)*ρ[1,1]   + R(0.5,0)*ρ[1,1+1]   ) 
+    for j in 2:L-1
+        # n = 0, l = j -1
+        dρ[1,j] = -(1/t)*(  P(0.5,j-1)*ρ[1,j-1] + Q(0.5,j-1)*ρ[1,j] + R(0.5,j-1)*ρ[1,j+1]   )
     end
+    # n = 0, l = L -1
+    dρ[1,L]     = -(1/t)*(  P(0.5,L-1)*ρ[1,L-1] +  Q(0.5,L-1)*ρ[1,L]                    )
+
+    for (i,nv) in enumerate(nₐᵣ[begin+1:end])
+        n = i+1
+        # Generalised Collision kernal
+
+        Cₙₗ = -ωᵣ*( (ρ[n-1,1]*ρeq(T,μ,1 - Λ,0) -ρ[nₙ-1,1]* ρeq(T,μ,nv- Λ,0) )*(  -ρeq(T,μ,1 - Λ,0)*(ρeq(T,μ,2 - Λ,0)^2) +  ρeq(T,μ,3 - Λ,0)*(ρeq(T,μ,1 - Λ,0)^2) ) - 
+        ρeq(T,μ,1 - Λ,0)*( ρ[nₙ-1,1]*ρeq(T,μ,2 - Λ,0) -  ρ[nₑ-1,1]*ρeq(T,μ,1 - Λ,0)  )*(  ρeq(T,μ,nv - Λ,0)*ρeq(T,μ,2 - Λ,0)   - ρeq(T,μ,1 - Λ,0)*ρeq(T,μ,nv+1 - Λ,0) )  )/( ρeq(T,μ,1 - Λ,0)*( -ρeq(T,μ,1 - Λ,0)*(ρeq(T,μ,2 - Λ,0)^2) +  ρeq(T,μ,3 - Λ,0)*(ρeq(T,μ,1 - Λ,0)^2)) )
+
+        """if nv == 2
+            println("Cₙₗ E : ",Cₙₗ)
+        elseif nv == 1
+            println("Cₙₗ N : ",Cₙₗ)
+        end"""
+        # Collision kernal zero for number and energy desnity, n = 1,2 (Array index 2,3) and l = 0 (Array index 1).
+        # n, l = 0
+        dρ[n,1] = -(1/t)*(                      Q(nv,0)*ρ[n,1] + R(nv,0)*ρ[n,2]    ) + Cₙₗ 
+        # Running through all l > 0 moments.
+        for j in 2:L-1 
+            # n = i-1, l = j-1                                                                     # Collision dependance.
+            dρ[n,j] = -(1/t)*( P(nv,j-1)*ρ[n,j-1] +  Q(nv,j-1)*ρ[n,j] + R(nv,j-1)*ρ[n,j+1]    )  - ωᵣ*ρ[n-1,j] 
+        end
+        # Truncation for l = L moment.
+        # n = i-1, l = L-1
+        dρ[n,L]     = -(1/t)*( P(nv,L-1)*ρ[n,L-1] +  Q(nv,L-1)*ρ[n,L]                      )  - ωᵣ*ρ[n-1,L]
+    end
+
     return dρ
 end
+
 #---------------------------------------------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------------------------------
 
 
 
-nₐᵣ = [1,2,3]
 
 
-nₙ  = 1
-nₑ  = 2
+nₐᵣ = [0.5,1,1.5,2]
+
+
+nₙ  = 2
+nₑ  = 4
 
 T₀  = 1
+Λ   = 1
 m   = 0
 μ₀  = 0
+
 
 N = size(nₐᵣ)[1]
 L = 10
 
 
 tₛ = 0.1
-tₑ = 50
+tₑ = 200
 ξ  = 0.01
 
-η₀ = (tₛ*T₀)/ξ
+
+Λ = 0.5
+#--------------------------------
+η₀ = (tₛ/ξ)*((T₀)^(1+0.5))
+#--------------------------------
 
 tspan = (tₛ,tₑ)
 
@@ -162,6 +202,11 @@ for (n,nv) in enumerate(nₐᵣ)
     end
 end
 
+ϵᵈ₀ = ρ₀[nₑ,1]
+nᵈ₀ = ρ₀[nₙ,1]
+
+println(" MDRTA Λ = 0.5 \n Free streaming lowest moment n ϵ {0.5,1,1.5,2} \n")
+
 println("m     : ", m)
 println("T₀    : ",(1/3)*(ϵᵈ₀/nᵈ₀))
 println("t₀    : ",tₛ)
@@ -171,12 +216,26 @@ println("η₀/s₀ : ",η₀)
 p = (N,L,η₀,nₐᵣ,nₙ,nₑ)
 
 tspan = trange((tₛ,tₑ),100,"log")
-ρₜ = RK4(ρ₀,tspan,RTA,p)
 
-E = ρₜ[:,nₑ,1]
-N = ρₜ[:,nₙ,1]
 
-T = (1/3)*(E./N)
-τ = (T.*(tspan)./η₀)
+#------------------------------------------------
+
+ρₜ = RK4(ρ₀,tspan,MDRTA_S,p)
+
+#------------------------------------------------
+
+ϵᵈ = ρₜ[:,nₑ,1]
+nᵈ = ρₜ[:,nₙ,1]
+
+T = (1/3)*(ϵᵈ./nᵈ)
+τ = ((T.^(1+0.5)).*(tspan)./η₀)
+
+println("Saving data.")
+
+y = (tspan,ρₜ)
+save("MDRTA_T_1_Λ_0.5_Z.jld","y",y)
+
 
 plot(τ,T, xaxis=:log)
+#plot(tspan,log.(nᵈ), xaxis=:log)
+#plot(tspan,T, xaxis=:log)

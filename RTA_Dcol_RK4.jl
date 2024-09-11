@@ -96,48 +96,8 @@ function ρeq(T,μ,n,l)
 end
 
 
-
-
-
-
-function RTA(dρ::Matrix,ρ,t::Float64,p)
-    N   = p[1]
-    L   = p[2]
-    η₀   = p[3]
-    nₐᵣ = p[4]
-    nₙ  = p[5]
-    nₑ  = p[6]
-
-    Nd = ρ[nₙ,1]
-    Ed = ρ[nₑ,1]
-    T = (1/3)*(Ed/Nd)
-    #print(T)
-    μ = T*log( 27*(π^2)*Nd*((Nd/Ed)^3))
+function RTA_D(dρ::Matrix,ρ,t::Float64,p)
     
-
-    for (n,nv) in enumerate(nₐᵣ)
-        for l =0:L-1
-            if l == 0
-                dρ[n,l+1] = - (0  + Q(nv,l)*ρ[n,l+1] + R(nv,l)*ρ[n,l+2] + (T/η₀)*t*(ρ[n,l+1] - ρeq(T,μ,nv,l) ) )/t 
-                #if nv ==1 || nv == 2
-                #    print((ρ[n,l+1] - ρeq(T,μ,nv,l) ),"\n")
-                #end
-            elseif l == L-1
-                dρ[n,l+1] = - (P(nv,l)*ρ[n,l]  + Q(nv,l)*ρ[n,l+1] + 0 + (T/η₀)*t*(ρ[n,l+1] - ρeq(T,μ,nv,l)  ) )/t
-            else
-                dρ[n,l+1] = - (P(nv,l)*ρ[n,l]  + Q(nv,l)*ρ[n,l+1] + R(nv,l)*ρ[n,l+2] + (T/η₀)*t*(ρ[n,l+1] - ρeq(T,μ,nv,l)  ) )/t
-                
-            end
-        end
-    end
-    return dρ
-end
-#---------------------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------------------
-
-
-
-function MDRTA_S(dρ::Matrix,ρ,t::Float64,p)
     N   = 3
     L   = p[2]
     η₀   = p[3]
@@ -145,22 +105,21 @@ function MDRTA_S(dρ::Matrix,ρ,t::Float64,p)
     nₙ  = p[5]
     nₑ  = p[6]
 
-    nᵈ = ρ[2,1]
-    ϵᵈ = ρ[3,1]
+    nᵈ = ρ[nₙ,1]
+    ϵᵈ = ρ[nₑ,1]
 
     # Computing Temperature and Chemical potential
     T = (1/3)*(ϵᵈ/nᵈ)    
     μ = T*log( 27*(π^2)*nᵈ*((nᵈ/ϵᵈ)^3))
 
     # The reciprocal of relaxation time
-    ωᵣ = (T^2)/η₀
-    Λ = 1
-    #Free Streaming of n = 0.
-    B = (ρeq(T,μ,2 - Λ,0)*( ρ[nₙ-1,1]*ρeq(T,μ,2 - Λ,0) -  ρ[nₑ-1,1]*ρeq(T,μ,1 - Λ,0)  ))/(  -ρeq(T,μ,1 - Λ,0)*(ρeq(T,μ,2 - Λ,0)^2) +  ρeq(T,μ,3 - Λ,0)*(ρeq(T,μ,1 - Λ,0)^2) )
+    
+    ωᵣ = T/η₀
+    B = (ρeq(T,μ,2 ,0)*( ρ[nₙ-1,1]*ρeq(T,μ,2,0) -  ρ[nₑ,1]*ρeq(T,μ,1,0)  ))/(  -ρeq(T,μ,1,0)*(ρeq(T,μ,2,0)^2) +  ρeq(T,μ,3,0)*(ρeq(T,μ,1,0)^2) )
 
     #Free Streaming of n = 0.
     # n = 0, l = 0
-    dρ[1,1]     = -(1/t)*(                      Q(0,0)*ρ[1,1]   + R(0,0)*ρ[1,1+1]   ) #- B*ωᵣ*( (ρeq(T,μ,0,0)^2)/ρeq(T,μ,1,0)  )
+    dρ[1,1]     = -(1/t)*(                      Q(0,0)*ρ[1,1]   + R(0,0)*ρ[1,1+1]   ) - B*ωᵣ*( (ρeq(T,μ,0,0)^2)/ρeq(T,μ,1,0))
     for j in 2:L-1
         # n = 0, l = j -1
         dρ[1,j] = -(1/t)*(  P(0,j-1)*ρ[1,j-1] + Q(0,j-1)*ρ[1,j] + R(0,j-1)*ρ[1,j+1]   )
@@ -168,18 +127,29 @@ function MDRTA_S(dρ::Matrix,ρ,t::Float64,p)
     # n = 0, l = L -1
     dρ[1,L]     = -(1/t)*(  P(0,L-1)*ρ[1,L-1] +  Q(0,L-1)*ρ[1,L]                    )
 
-    for i in 2:3
-            # Collision kernal zero for number and energy desnity, n = 1,2 (Array index 2,3) and l = 0 (Array index 1).
-            # n = 1,2, l = 0
-            dρ[i,1] = -(1/t)*(                      Q(i-1,0)*ρ[i,1] + R(i-1,0)*ρ[i,2]    )
+    for (i,nv) in enumerate(nₐᵣ[begin+1:end])
+        n = i+1
+        # Generalised Collision kernal
+
+        Cₙₗ = -ωᵣ*( (ρ[n,1]*ρeq(T,μ,1 ,0) -ρ[nₙ,1]* ρeq(T,μ,nv,0) )*(  -ρeq(T,μ,1 ,0)*(ρeq(T,μ,2 ,0)^2) +  ρeq(T,μ,3 ,0)*(ρeq(T,μ,1 ,0)^2) ) - 
+        ρeq(T,μ,1,0)*( ρ[nₙ,1]*ρeq(T,μ,2 ,0) -  ρ[nₑ,1]*ρeq(T,μ,1 ,0)  )*(  ρeq(T,μ,nv ,0)*ρeq(T,μ,2,0)   - ρeq(T,μ,1,0)*ρeq(T,μ,nv+1 ,0) )  )/( ρeq(T,μ,1 ,0)*( -ρeq(T,μ,1,0)*(ρeq(T,μ,2,0)^2) +  ρeq(T,μ,3,0)*(ρeq(T,μ,1,0)^2)) )
+
+        """if nv == 2
+            println("Cₙₗ E : ",Cₙₗ)
+        elseif nv == 1
+            println("Cₙₗ N : ",Cₙₗ)
+        end"""
+        # Collision kernal zero for number and energy desnity, n = 1,2 (Array index 2,3) and l = 0 (Array index 1).
+        # n, l = 0
+        dρ[n,1] = -(1/t)*(                      Q(nv,0)*ρ[n,1] + R(nv,0)*ρ[n,2]    ) + Cₙₗ 
         # Running through all l > 0 moments.
         for j in 2:L-1 
             # n = i-1, l = j-1                                                                     # Collision dependance.
-            dρ[i,j] = -(1/t)*( P(i-1,j-1)*ρ[i,j-1] +  Q(i-1,j-1)*ρ[i,j] + R(i-1,j-1)*ρ[i,j+1]    )  - ωᵣ*ρ[i-1,j] 
+            dρ[n,j] = -(1/t)*( P(nv,j-1)*ρ[n,j-1] +  Q(nv,j-1)*ρ[n,j] + R(nv,j-1)*ρ[n,j+1]    )  - ωᵣ*ρ[n,j] 
         end
         # Truncation for l = L moment.
         # n = i-1, l = L-1
-        dρ[i,L]     = -(1/t)*( P(i-1,L-1)*ρ[i,L-1] +  Q(i-1,L-1)*ρ[i,L]                      )  - ωᵣ*ρ[i-1,L]
+        dρ[n,L]     = -(1/t)*( P(nv,L-1)*ρ[n,L-1] +  Q(nv,L-1)*ρ[n,L]                      )  - ωᵣ*ρ[n,L]
     end
 
     return dρ
@@ -187,12 +157,7 @@ end
 
 
 
-
-#---------------------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------------------
-
-
-nₐᵣ = [0,1,2]
+nₐᵣ = [0,1,2,3]
 
 
 nₙ  = 2
@@ -209,15 +174,15 @@ L = 10
 
 
 tₛ = 0.1
-tₑ = 100
+tₑ = 200
 ξ  = 0.01
 
-Λ = 1
-#------------------------------------------
 
-η₀ = (tₛ/ξ)*((T₀)^(1+1))
+Λ = 0.0
+#--------------------------------
+η₀ = (tₛ/ξ)*(T₀)
+#--------------------------------
 
-#------------------------------------------
 tspan = (tₛ,tₑ)
 
 ρ₀ = Matrix{Float64}(undef, N, L)
@@ -231,24 +196,39 @@ end
 ϵᵈ₀ = ρ₀[nₑ,1]
 nᵈ₀ = ρ₀[nₙ,1]
 
-println("T₀ : ",(1/3)*(ϵᵈ₀/nᵈ₀))
+println("RTA  \n Relaxing lowest moment. n ϵ {0,1,2,3} \n")
 
+println("m     : ", m)
+println("T₀    : ",(1/3)*(ϵᵈ₀/nᵈ₀))
+println("t₀    : ",tₛ)
+println("η₀/s₀ : ",η₀)
 
 p = (N,L,η₀,nₐᵣ,nₙ,nₑ)
 
 tspan = trange((tₛ,tₑ),100,"log")
 
-ρₜ = RK4(ρ₀,tspan,MDRTA_S,p)
+
+#------------------------------------------------
+println("\nSolving Denicol RTA.")
+
+ρₜ = RK4(ρ₀,tspan,RTA_D,p)
+
+#------------------------------------------------
 
 ϵᵈ = ρₜ[:,nₑ,1]
 nᵈ = ρₜ[:,nₙ,1]
 
 T = (1/3)*(ϵᵈ./nᵈ)
-τ = ((T.^(1+1)).*(tspan)./η₀)
+τ = (T.*(tspan)./η₀)
 
 println("Saving data.")
-save("Data/RTA_T_1_Λ_1_R.jld","t",tspan)
-save("Data/RTA_T_1_Λ_1_R.jld","ρ",ρₜ)
 
+
+println("Saving data.")
+
+y = (tspan,ρₜ)
+save("Data/RTA_Dcol_T_1.jld","y",y)
+
+
+println("Plotting Temperature proper time graph.")
 plot(τ,T, xaxis=:log)
-#plot(tspan,T, xaxis=:log)

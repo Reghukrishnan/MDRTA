@@ -4,6 +4,7 @@ using SpecialFunctions
 using Plots
 
 
+
 function P(n,l) 
     return (n+2l)*( (2l*(2l-1))/((4l+1)*(4l-1)) )   
 end
@@ -81,7 +82,7 @@ L = 10
 
 
 ti = 0.1
-tf = 500
+tf = 200
 ξ  = 0.01
 
 η₀ = (ti*T₀)/ξ
