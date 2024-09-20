@@ -96,8 +96,10 @@ function ρeq(T,μ,n,l)
 end
 
 
-function RTA_D(dρ::Matrix,ρ,t::Float64,p)
-    
+#---------------------------------------------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------------------------------
+
+function MDRTA_S(dρ::Matrix,ρ,t::Float64,p)
     N   = 3
     L   = p[2]
     η₀   = p[3]
@@ -113,31 +115,31 @@ function RTA_D(dρ::Matrix,ρ,t::Float64,p)
     μ = T*log( 27*(π^2)*nᵈ*((nᵈ/ϵᵈ)^3))
 
     # The reciprocal of relaxation time
+    Λ = 0.5
+    ωᵣ = (T^(1+0.5))/η₀
+
+
     
-    ωᵣ = T/η₀
-    B = (ρeq(T,μ,2 ,0)*( ρ[nₙ-1,1]*ρeq(T,μ,2,0) -  ρ[nₑ,1]*ρeq(T,μ,1,0)  ))/(  -ρeq(T,μ,1,0)*(ρeq(T,μ,2,0)^2) +  ρeq(T,μ,3,0)*(ρeq(T,μ,1,0)^2) )
 
     #Free Streaming of n = 0.
     # n = 0, l = 0
-    dρ[1,1]     = -(1/t)*(                      Q(0,0)*ρ[1,1]   + R(0,0)*ρ[1,1+1]   ) - B*ωᵣ*( (ρeq(T,μ,0,0)^2)/ρeq(T,μ,1,0))
+    n₀ = nₐᵣ[1]
+    dρ[1,1]     = -(1/t)*(                      Q(n₀,0)*ρ[1,1]   + R(n₀,0)*ρ[1,1+1]   ) 
     for j in 2:L-1
         # n = 0, l = j -1
-        dρ[1,j] = -(1/t)*(  P(0,j-1)*ρ[1,j-1] + Q(0,j-1)*ρ[1,j] + R(0,j-1)*ρ[1,j+1]   )
+        dρ[1,j] = -(1/t)*(  P(n₀,j-1)*ρ[1,j-1] + Q(n₀,j-1)*ρ[1,j] + R(0n₀,j-1)*ρ[1,j+1]   )
     end
     # n = 0, l = L -1
-    dρ[1,L]     = -(1/t)*(  P(0,L-1)*ρ[1,L-1] +  Q(0,L-1)*ρ[1,L]                    )
+    dρ[1,L]     = -(1/t)*(  P(n₀,L-1)*ρ[1,L-1] +  Q(n₀,L-1)*ρ[1,L]                    )
 
     for (i,nv) in enumerate(nₐᵣ[begin+1:end])
         n = i+1
         # Generalised Collision kernal
 
-        Cₙₗ = -ωᵣ*( (ρ[n,1]*ρeq(T,μ,1 ,0) -ρ[nₙ,1]* ρeq(T,μ,nv,0) )*(  -ρeq(T,μ,1 ,0)*(ρeq(T,μ,2 ,0)^2) +  ρeq(T,μ,3 ,0)*(ρeq(T,μ,1 ,0)^2) ) - 
-        ρeq(T,μ,1,0)*( ρ[nₙ,1]*ρeq(T,μ,2 ,0) -  ρ[nₑ,1]*ρeq(T,μ,1 ,0)  )*(  ρeq(T,μ,nv ,0)*ρeq(T,μ,2,0)   - ρeq(T,μ,1,0)*ρeq(T,μ,nv+1 ,0) )  )/( ρeq(T,μ,1 ,0)*( -ρeq(T,μ,1,0)*(ρeq(T,μ,2,0)^2) +  ρeq(T,μ,3,0)*(ρeq(T,μ,1,0)^2)) )
+        Cₙₗ = -ωᵣ*( ρ[n-1,1] - ρ[nₑ-1,1]*(ρeq(T,μ,nv - Λ,0)/ρeq(T,μ,2 - Λ,0))  )
 
         """if nv == 2
             println("Cₙₗ E : ",Cₙₗ)
-        elseif nv == 1
-            println("Cₙₗ N : ",Cₙₗ)
         end"""
         # Collision kernal zero for number and energy desnity, n = 1,2 (Array index 2,3) and l = 0 (Array index 1).
         # n, l = 0
@@ -145,23 +147,28 @@ function RTA_D(dρ::Matrix,ρ,t::Float64,p)
         # Running through all l > 0 moments.
         for j in 2:L-1 
             # n = i-1, l = j-1                                                                     # Collision dependance.
-            dρ[n,j] = -(1/t)*( P(nv,j-1)*ρ[n,j-1] +  Q(nv,j-1)*ρ[n,j] + R(nv,j-1)*ρ[n,j+1]    )  - ωᵣ*ρ[n,j] 
+            dρ[n,j] = -(1/t)*( P(nv,j-1)*ρ[n,j-1] +  Q(nv,j-1)*ρ[n,j] + R(nv,j-1)*ρ[n,j+1]    )  - ωᵣ*ρ[n-1,j] 
         end
         # Truncation for l = L moment.
         # n = i-1, l = L-1
-        dρ[n,L]     = -(1/t)*( P(nv,L-1)*ρ[n,L-1] +  Q(nv,L-1)*ρ[n,L]                      )  - ωᵣ*ρ[n,L]
+        dρ[n,L]     = -(1/t)*( P(nv,L-1)*ρ[n,L-1] +  Q(nv,L-1)*ρ[n,L]                      )  - ωᵣ*ρ[n-1,L]
     end
 
     return dρ
 end
 
+#---------------------------------------------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------------------------------
 
 
-nₐᵣ = [0,1,2,3]
 
 
-nₙ  = 2
-nₑ  = 3
+
+nₐᵣ = [1,1.25,1.5,1.75,2]
+
+
+nₙ  = 1
+nₑ  = 5
 
 T₀  = 1
 Λ   = 1
@@ -178,9 +185,9 @@ tₑ = 100
 ξ  = 0.01
 
 
-Λ = 0.0
+Λ = 0.25
 #--------------------------------
-η₀ = (tₛ/ξ)*(T₀)
+η₀ = (tₛ/ξ)*((T₀)^(1+0.25))
 #--------------------------------
 
 tspan = (tₛ,tₑ)
@@ -196,12 +203,14 @@ end
 ϵᵈ₀ = ρ₀[nₑ,1]
 nᵈ₀ = ρ₀[nₙ,1]
 
-println("RTA  \n Relaxing lowest moment. n ϵ {0,1,2,3} \n")
+println(" MDRTA Λ = 0.5 \n Free streaming lowest moment n ϵ {1,1.5,2} \n")
 
+η = η₀*T₀^(0.5)
 println("m     : ", m)
 println("T₀    : ",(1/3)*(ϵᵈ₀/nᵈ₀))
 println("t₀    : ",tₛ)
-println("η₀/s₀ : ",η₀)
+println("η₀/s₀ : ",η)
+
 
 p = (N,L,η₀,nₐᵣ,nₙ,nₑ)
 
@@ -209,9 +218,8 @@ tspan = trange((tₛ,tₑ),100,"log")
 
 
 #------------------------------------------------
-println("\nSolving Denicol RTA.")
 
-ρₜ = RK4(ρ₀,tspan,RTA_D,p)
+ρₜ = RK4(ρ₀,tspan,MDRTA_S,p)
 
 #------------------------------------------------
 
@@ -219,16 +227,14 @@ println("\nSolving Denicol RTA.")
 nᵈ = ρₜ[:,nₙ,1]
 
 T = (1/3)*(ϵᵈ./nᵈ)
-#τ = (T.*(tspan)./η₀)
+#τ = ((T.^(1+0.5)).*(tspan)./η₀)
 τ = tspan
 println("Saving data.")
 
-
-println("Saving data.")
-
 y = (tspan,ρₜ)
-save("Data/RTA_Dcol_T_1.jld","y",y)
+save("Data/MDRTA_T_1_t0_$(tₛ)_Λ_0.25_ZZ.jld","y",y)
 
 
-println("Plotting Temperature proper time graph.")
-plot(τ,T, xaxis=:log, xlabel="τ", ylabel="T",label="η = $(η₀), Λ = 0",dpi=300)
+plot(τ,T, xaxis=:log,xlabel="τ", ylabel="T",label="η = $(η), Λ = 0.25",dpi=300)
+#plot(tspan,log.(nᵈ), xaxis=:log)
+#plot(tspan,T, xaxis=:log)

@@ -19,7 +19,7 @@ end
     Runge–Kutta implimentation for first order differential equations of one variable.
     Returns an array with [y(t)]
 """
-function RK4!(y₀::Number,ts,fun,p = nothing)
+function RK4(y₀::Number,ts,fun,p = nothing)
     print("Number RK4 Solver Called. \n")
 
     ysize = size(ts)  # Get the size of the time series amtrix
@@ -69,13 +69,13 @@ end
     Runge–Kutta implimentation for first order coupled differential equations organised in n x 1 matrix form.
     Returns an array with [y(t)] 
 """
-function dLinear(dy::Vector,y,t::Number,A::Matrix)
+function dLinear!(dy::Vector,y,t::Number,A::Matrix)
     dy = A*y 
     return dy
 
 end
 
-function RK4!(y₀::Vector,ts,fun,p = nothing)
+function RK4(y₀::Vector,ts,fun,p = nothing)
     print("Vector RK4 Solver Called. \n")
 
     ysize = (size(ts)...,size(y₀)...)  # Get the size of the time series amtrix
@@ -130,7 +130,7 @@ end
     Runge–Kutta implimentation for first order coupled differential equations organised in n x l matrix form.
     Returns an array with [y(t)] 
 """
-function RK4!(y₀::Matrix,ts::Vector,fun,p = nothing)
+function RK4(y₀::Matrix,ts::Vector,fun,p = nothing)
     print("Array RK4 Solver Called. \n")
     
     ysize = (size(ts)...,size(y₀)...)  # Get the size of the time series amtrix

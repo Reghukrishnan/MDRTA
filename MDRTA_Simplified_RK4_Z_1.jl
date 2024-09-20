@@ -197,7 +197,7 @@ L = 10
 
 
 tₛ = 0.1
-tₑ = 200
+tₑ = 100
 ξ  = 0.01
 
 Λ = 1
@@ -223,7 +223,7 @@ println(" MDRTA Λ = 1.0 \n Free streaming lowest moment n ϵ {1,2} \n")
 println("m     : ", m)
 println("T₀    : ",(1/3)*(ϵᵈ₀/nᵈ₀))
 println("t₀    : ",tₛ)
-println("η₀/s₀ : ",η₀)
+println("η₀/s₀ : ",η₀*T₀)
 
 
 p = (N,L,η₀,nₐᵣ,nₙ,nₑ)
@@ -243,14 +243,14 @@ tspan = trange((tₛ,tₑ),100,"log")
 nᵈ = ρₜ[:,nₙ,1]
 
 T = (1/3)*(ϵᵈ./nᵈ)
-τ = ((T.^(1+1)).*(tspan)./η₀)
-
+#τ = ((T.^(1+0)).*(tspan)./η₀)
+τ = tspan
 println("Saving data.")
 
 y = (tspan,ρₜ)
-save("Data/MDRTA_T_1_Λ_1_Z.jld","y",y)
+save("Data/MDRTA_T_1_t0_$(tₛ)_Λ_1_ZZ.jld","y",y)
 
-
-plot(τ,T, xaxis=:log)
+η = η₀*T₀
+plot(τ,T, xaxis=:log, xlabel="τ", ylabel="T",label="η = $(η), Λ = 1",dpi=300)
 #plot(tspan,log.(nᵈ), xaxis=:log)
 #plot(tspan,T, xaxis=:log)
