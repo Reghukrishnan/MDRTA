@@ -15,7 +15,7 @@ function trange(tspan,N,interpolation)
         tₛ       = tspan[1]
         tₑ      = tspan[2]
         step    = (tₑ -  tₛ)/N
-        return range(tsapn[2],tspan[1],step = step)
+        return [tₛ + i*step for i in 1:N ]
     else
         println("Invalid Interpolation input.") 
     end    
@@ -124,13 +124,13 @@ function MDRTA_S(dρ::Matrix,ρ,t::Float64,p)
     #Free Streaming of n = 0.
     # n = 0, l = 0
     n₀ = nₐᵣ[1]
-    dρ[1,1]     = -(1/t)*(                      Q(n₀,0)*ρ[1,1]   + R(n₀,0)*ρ[1,1+1]   ) 
+    dρ[1,1]     = -(1/t)*(                      Q(n₀,0)*ρ[1,1]   + R(n₀,0)*ρ[1,1+1]   ) #- ωᵣ*(ρ[1,1] - ρeq(T,μ,n₀,0))
     for j in 2:L-1
         # n = 0, l = j -1
-        dρ[1,j] = -(1/t)*(  P(n₀,j-1)*ρ[1,j-1] + Q(n₀,j-1)*ρ[1,j] + R(0n₀,j-1)*ρ[1,j+1]   )
+        dρ[1,j] = -(1/t)*(  P(n₀,j-1)*ρ[1,j-1] + Q(n₀,j-1)*ρ[1,j] + R(0n₀,j-1)*ρ[1,j+1]   ) 
     end
     # n = 0, l = L -1
-    dρ[1,L]     = -(1/t)*(  P(n₀,L-1)*ρ[1,L-1] +  Q(n₀,L-1)*ρ[1,L]                    )
+    dρ[1,L]     = -(1/t)*(  P(n₀,L-1)*ρ[1,L-1] +  Q(n₀,L-1)*ρ[1,L]                    ) 
 
     for (i,nv) in enumerate(nₐᵣ[begin+1:end])
         n = i+1
@@ -177,11 +177,11 @@ m   = 0
 
 
 N = size(nₐᵣ)[1]
-L = 10
+L = 150
 
 
 tₛ = 0.1
-tₑ = 100
+tₑ = 170
 ξ  = 0.01
 
 
@@ -214,7 +214,7 @@ println("η₀/s₀ : ",η)
 
 p = (N,L,η₀,nₐᵣ,nₙ,nₑ)
 
-tspan = trange((tₛ,tₑ),100,"log")
+tspan = trange((tₛ,tₑ),1000,"log")
 
 
 #------------------------------------------------
@@ -223,18 +223,40 @@ tspan = trange((tₛ,tₑ),100,"log")
 
 #------------------------------------------------
 
-ϵᵈ = ρₜ[:,nₑ,1]
-nᵈ = ρₜ[:,nₙ,1]
+tₗ = 700
+ϵᵈ = ρₜ[tₗ:end,nₑ,1]
+nᵈ = ρₜ[tₗ:end,nₙ,1]
+
 
 T = (1/3)*(ϵᵈ./nᵈ)
 #τ = ((T.^(1+0.5)).*(tspan)./η₀)
-τ = tspan
+τ = tspan[tₗ:end]
 println("Saving data.")
 
 y = (tspan,ρₜ)
 save("Data/MDRTA_T_1_t0_$(tₛ)_Λ_0.5_ZZ.jld","y",y)
 
+#plot(τ,ϵᵈ, xaxis=:log,xlabel="τ", ylabel="",label="η = $(η), Λ = 0.5",dpi=300)
+plot(τ,ϵᵈ, xaxis=:log,xlabel="τ", ylabel="ρ",label="ϵᵈ",dpi=500)
 
-plot(τ,T, xaxis=:log,xlabel="τ", ylabel="T",label="η = $(η), Λ = 0.5",dpi=300)
+plot!(τ,ρₜ[tₗ:end,nₑ,2], xaxis=:log,label="ρ($(nₑ-1),$(2-1))")
+plot!(τ,ρₜ[tₗ:end,nₑ-1,2], xaxis=:log,label="ρ($(nₑ-1.5),$(2-1))")
+
+
+
+plot!(τ,ρₜ[tₗ:end,nₑ,3], xaxis=:log,label="ρ($(nₑ-1),$(3-1))")
+plot!(τ,ρₜ[tₗ:end,nₑ-1,3], xaxis=:log,label="ρ($(nₑ-1.5),$(3-1))")
+
+plot!(τ,ρₜ[tₗ:end,nₑ,4], xaxis=:log,label="ρ($(nₑ-1),$(4-1))")
+plot!(τ,ρₜ[tₗ:end,nₑ-1,4], xaxis=:log,label="ρ($(nₑ-1.5),$(4-1))")
+
+#plot!(τ,nᵈ, xaxis=:log,label="nᵈ")
+#plot!(τ,ϵᵈ./nᵈ, xaxis=:log,label="nᵈ")
 #plot(tspan,log.(nᵈ), xaxis=:log)
 #plot(tspan,T, xaxis=:log)
+
+
+#n= nₑ#-1
+#l = 1
+#Mnl = ρₜ[:,n,l]
+#plot!(τ,Mnl, xaxis=:log,xlabel="τ", ylabel="M($(n),$(l))",label="ρ($(n),$(l)), Λ = 0.5",dpi=300)
